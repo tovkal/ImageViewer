@@ -11,12 +11,13 @@ import UIKit
 class ImageViewer: UIViewController {
     fileprivate let originalImageView: UIImageView
     fileprivate let presentingVC: UIViewController
-    fileprivate var imageView = UIImageView()
-    fileprivate var scrollView = UIScrollView()
+    fileprivate lazy var scrollView = UIScrollView()
+    fileprivate lazy var imageView = UIImageView()
     
-    // Dissmiss with flick vars
-    fileprivate var attachmentBehavior: UIAttachmentBehavior?
-    fileprivate var animator = UIDynamicAnimator()
+    fileprivate lazy var isDraggingImage = false
+    fileprivate lazy var initialTouchPoint = CGPoint.zero
+    fileprivate lazy var attachmentBehavior = UIAttachmentBehavior()
+    fileprivate lazy var animator = UIDynamicAnimator()
     
     static func showImage(imageView: UIImageView, presentingVC: UIViewController) {
         let imageViewer = ImageViewer(imageView: imageView, presentingVC: presentingVC)
@@ -28,45 +29,37 @@ class ImageViewer: UIViewController {
         self.presentingVC = presentingVC
         super.init(nibName: nil, bundle: nil)
         
-        configureView()
-        configureGestureRecognizers()
-        
-        self.modalPresentationStyle = .overCurrentContext
-    }
-    
-    fileprivate func configureGestureRecognizers() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(ImageViewer.tapImage(_:)))
-        scrollView.addGestureRecognizer(tap)
-        
-        let swipeDismiss = UIPanGestureRecognizer(target: self, action: #selector(ImageViewer.scrollViewDidSwipeToDismiss(_:)))
-        swipeDismiss.delegate = self
-        self.view.addGestureRecognizer(swipeDismiss)
-    }
-    
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        self.view.addSubview(scrollView)
-        displayImage()
-    }
-    
-    fileprivate func displayImage() {
-        guard let image = originalImageView.image else { return }
-        
-        imageView.image = image
-        imageView.frame = originalImageView.convert(originalImageView.bounds, to: self.view)
-        
-        UIView.animate(withDuration: 0.2, animations: {
-            let imageSize = image.size
-            let imageOrigin = CGPoint(x: self.view.frame.size.width/2 - imageSize.width/2, y: self.view.frame.size.height/2 - imageSize.height/2)
-            self.imageView.frame = CGRect(x: imageOrigin.x, y: imageOrigin.y, width: imageSize.width, height: imageSize.height)
-        })
+        self.modalPresentationStyle = .overFullScreen
     }
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    fileprivate func configureView() {
+    override func loadView() {
+        super.loadView()
+        
+        configureViews()
+        configureGestures()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        guard let image = originalImageView.image else { return }
+        
+        imageView.frame = originalImageView.convert(originalImageView.bounds, to: self.view)
+        
+        UIView.animate(withDuration: 0.2, animations: {
+            let imageSize = image.size
+            let imageOrigin = CGPoint(x: self.view.frame.size.width/2 - imageSize.width/2,
+                                      y: self.view.frame.size.height/2 - imageSize.height/2)
+            self.imageView.frame = CGRect(x: imageOrigin.x, y: imageOrigin.y,
+                                          width: imageSize.width, height: imageSize.height)
+        })
+    }
+    
+    fileprivate func configureViews() {
         // ImageViewer's view
         self.view = UIView(frame: UIScreen.main.bounds)
         
@@ -85,18 +78,30 @@ class ImageViewer: UIViewController {
         }
         
         scrollView.frame = self.view.bounds
-        scrollView.maximumZoomScale = 10
         scrollView.minimumZoomScale = 1
-        scrollView.delegate = self
-        scrollView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        scrollView.maximumZoomScale = 10
+        scrollView.isScrollEnabled = false
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        self.view.addSubview(scrollView)
         
-        // Image view
         imageView.frame = self.view.bounds
+        imageView.image = originalImageView.image
         imageView.contentMode = .scaleAspectFit
+        imageView.isUserInteractionEnabled = true
         imageView.clipsToBounds = true
+        imageView.layer.allowsEdgeAntialiasing = true
         scrollView.addSubview(imageView)
+    }
+    
+    fileprivate func configureGestures() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(ImageViewer.tapImage(_:)))
+        scrollView.addGestureRecognizer(tap)
         
-        animator = UIDynamicAnimator(referenceView: scrollView)
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(ImageViewer.dismissPan(_:)))
+        panGesture.maximumNumberOfTouches = 1
+        panGesture.delegate = self
+        scrollView.addGestureRecognizer(panGesture)
     }
     
     func tapImage(_ sender: UITapGestureRecognizer) {
@@ -106,21 +111,38 @@ class ImageViewer: UIViewController {
     }
 }
 
-extension ImageViewer: UIScrollViewDelegate, UIGestureRecognizerDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return self.imageView
-    }
-    
-    // When zooming, center the image
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        let horizontalOffset = (scrollView.bounds.size.width > scrollView.contentSize.width) ? ((scrollView.bounds.size.width - scrollView.contentSize.width) * 0.5): 0.0
-        let verticalOffset   = (scrollView.bounds.size.height > scrollView.contentSize.height) ? ((scrollView.bounds.size.height - scrollView.contentSize.height) * 0.5): 0.0
+extension ImageViewer: UIGestureRecognizerDelegate {
+    func dismissPan(_ recognizer: UIPanGestureRecognizer) {
+        let touchPoint = recognizer.location(in: recognizer.view)
+        let translation = recognizer.translation(in: recognizer.view)
         
-        imageView.center = CGPoint(x: scrollView.contentSize.width * 0.5 + horizontalOffset, y: scrollView.contentSize.height * 0.5 + verticalOffset)
-    }
-    
-    func scrollViewDidSwipeToDismiss(_ gesture: UIPanGestureRecognizer) {
-        // Only dismiss when not zoomed in
-        guard scrollView.zoomScale == scrollView.minimumZoomScale else { return }
+        switch recognizer.state {
+        case .began:
+            isDraggingImage = imageView.frame.contains(touchPoint)
+            if isDraggingImage {
+                initialTouchPoint = touchPoint
+                let offset = UIOffset(horizontal: touchPoint.x - imageView.center.x, vertical: touchPoint.y - imageView.center.y)
+                attachmentBehavior = UIAttachmentBehavior(item: imageView, offsetFromCenter: offset, attachedToAnchor: touchPoint)
+                animator.addBehavior(attachmentBehavior)
+            }
+        case .changed:
+            var newAnchor = initialTouchPoint
+            newAnchor.x += translation.x
+            newAnchor.y += translation.y
+            attachmentBehavior.anchorPoint = newAnchor
+        case .ended:
+            isDraggingImage = false
+            initialTouchPoint = .zero
+            animator.removeAllBehaviors()
+            
+            UIViewPropertyAnimator(duration: 0.3, curve: .easeOut, animations: {
+                self.imageView.transform = CGAffineTransform.identity
+                self.imageView.center = CGPoint(x: self.view.bounds.width / 2,
+                                                y: self.view.bounds.height / 2)
+            }).startAnimation()
+            break
+        default:
+            break
+        }
     }
 }
