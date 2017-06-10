@@ -13,10 +13,12 @@ class ImageViewer: UIViewController {
     fileprivate let presentingVC: UIViewController
     fileprivate lazy var scrollView = UIScrollView()
     fileprivate lazy var imageView = UIImageView()
+    fileprivate var blurEffectView: UIVisualEffectView?
     
     fileprivate lazy var isDraggingImage = false
     fileprivate lazy var initialTouchPoint = CGPoint.zero
-    fileprivate lazy var attachmentBehavior = UIAttachmentBehavior()
+    fileprivate lazy var dragOffsetFromTranslation = UIOffset.zero
+    fileprivate var attachmentBehavior: UIAttachmentBehavior?
     fileprivate lazy var animator = UIDynamicAnimator()
     
     static func showImage(imageView: UIImageView, presentingVC: UIViewController) {
@@ -71,7 +73,7 @@ class ImageViewer: UIViewController {
             blurEffectView.contentView.isUserInteractionEnabled = true
             blurEffectView.frame = self.view.bounds
             blurEffectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            
+            self.blurEffectView = blurEffectView
             self.view.addSubview(blurEffectView)
         } else {
             self.view.backgroundColor = UIColor.black
@@ -92,6 +94,8 @@ class ImageViewer: UIViewController {
         imageView.clipsToBounds = true
         imageView.layer.allowsEdgeAntialiasing = true
         scrollView.addSubview(imageView)
+        
+        animator = UIDynamicAnimator(referenceView: scrollView)
     }
     
     fileprivate func configureGestures() {
@@ -115,34 +119,86 @@ extension ImageViewer: UIGestureRecognizerDelegate {
     func dismissPan(_ recognizer: UIPanGestureRecognizer) {
         let touchPoint = recognizer.location(in: recognizer.view)
         let translation = recognizer.translation(in: recognizer.view)
+        let velocity = recognizer.velocity(in: recognizer.view)
+        let distance = sqrt(pow(velocity.x, 2) + pow(velocity.y, 2))
         
         switch recognizer.state {
         case .began:
             isDraggingImage = imageView.frame.contains(touchPoint)
             if isDraggingImage {
-                initialTouchPoint = touchPoint
-                let offset = UIOffset(horizontal: touchPoint.x - imageView.center.x, vertical: touchPoint.y - imageView.center.y)
-                attachmentBehavior = UIAttachmentBehavior(item: imageView, offsetFromCenter: offset, attachedToAnchor: touchPoint)
-                animator.addBehavior(attachmentBehavior)
+                startImageDragging(touchPoint, translationOffset: .zero)
             }
         case .changed:
-            var newAnchor = initialTouchPoint
-            newAnchor.x += translation.x
-            newAnchor.y += translation.y
-            attachmentBehavior.anchorPoint = newAnchor
+            if isDraggingImage {
+                var newAnchor = initialTouchPoint
+                newAnchor.x += translation.x + dragOffsetFromTranslation.horizontal
+                newAnchor.y += translation.y + dragOffsetFromTranslation.vertical
+                attachmentBehavior?.anchorPoint = newAnchor
+            } else {
+                isDraggingImage = imageView.frame.contains(touchPoint)
+                if isDraggingImage {
+                    let translationOffset = UIOffset(horizontal: -1 * translation.x, vertical: -1 * translation.y)
+                    startImageDragging(touchPoint, translationOffset: translationOffset)
+                }
+            }
         case .ended:
-            isDraggingImage = false
-            initialTouchPoint = .zero
-            animator.removeAllBehaviors()
-            
-            UIViewPropertyAnimator(duration: 0.3, curve: .easeOut, animations: {
-                self.imageView.transform = CGAffineTransform.identity
-                self.imageView.center = CGPoint(x: self.view.bounds.width / 2,
-                                                y: self.view.bounds.height / 2)
-            }).startAnimation()
-            break
+            if distance > 600 {
+                dismiss(with: velocity)
+            } else {
+                cancelDrag()
+            }
         default:
             break
         }
+    }
+    
+    fileprivate func startImageDragging(_ touchPoint: CGPoint, translationOffset: UIOffset) {
+        initialTouchPoint = touchPoint
+        dragOffsetFromTranslation = translationOffset
+        
+        let offset = UIOffset(horizontal: touchPoint.x - imageView.center.x, vertical: touchPoint.y - imageView.center.y)
+        let attachmentBehavior = UIAttachmentBehavior(item: imageView, offsetFromCenter: offset, attachedToAnchor: touchPoint)
+        self.attachmentBehavior = attachmentBehavior
+        animator.addBehavior(attachmentBehavior)
+    }
+    
+    fileprivate func dismiss(with velocity: CGPoint) {
+        let pushBehavior = UIPushBehavior(items: [imageView], mode: .instantaneous)
+        pushBehavior.pushDirection = CGVector(dx: velocity.x * 0.1, dy: velocity.y * 0.1)
+        pushBehavior.setTargetOffsetFromCenter(dragOffsetFromTranslation, for: imageView)
+        pushBehavior.action = pushAction
+        
+        animator.addBehavior(pushBehavior)
+        
+        if let attachmentBehavior = attachmentBehavior {
+            animator.removeBehavior(attachmentBehavior)
+        }
+    }
+    
+    fileprivate func pushAction() {
+        let visibleRect = scrollView.convert(self.view.bounds, from: self.view)
+        let isViewOffscreen = animator.items(in: visibleRect).count == 0
+        if isViewOffscreen {
+            animator.removeAllBehaviors()
+            UIView.animate(withDuration: 0.25, animations: {
+                [unowned self] in
+                self.view.alpha = 0
+                self.blurEffectView?.effect = UIBlurEffect(style: .light)
+                }, completion: {
+                    finished in
+                    self.blurEffectView?.effect = nil
+                    self.dismiss(animated: false, completion: nil)
+            })
+        }
+    }
+    
+    fileprivate func cancelDrag() {
+        animator.removeAllBehaviors()
+        
+        UIViewPropertyAnimator(duration: 0.3, curve: .easeOut, animations: {
+            self.imageView.transform = CGAffineTransform.identity
+            self.imageView.center = CGPoint(x: self.view.bounds.width / 2,
+                                            y: self.view.bounds.height / 2)
+        }).startAnimation()
     }
 }
