@@ -80,6 +80,7 @@ class ImageViewer: UIViewController {
         }
         
         scrollView.frame = self.view.bounds
+        scrollView.delegate = self
         scrollView.minimumZoomScale = 1
         scrollView.maximumZoomScale = 10
         scrollView.isScrollEnabled = false
@@ -112,6 +113,20 @@ class ImageViewer: UIViewController {
         UIView.animate(withDuration: 0.2, animations: {
             self.imageView.frame = self.originalImageView.frame
         }, completion: { finished in self.dismiss(animated: false) })
+    }
+}
+
+extension ImageViewer: UIScrollViewDelegate {
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return self.imageView
+    }
+    
+    // When zooming, center the image
+    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+        let horizontalOffset = (scrollView.bounds.size.width > scrollView.contentSize.width) ? ((scrollView.bounds.size.width - scrollView.contentSize.width) * 0.5): 0.0
+        let verticalOffset   = (scrollView.bounds.size.height > scrollView.contentSize.height) ? ((scrollView.bounds.size.height - scrollView.contentSize.height) * 0.5): 0.0
+        
+        imageView.center = CGPoint(x: scrollView.contentSize.width * 0.5 + horizontalOffset, y: scrollView.contentSize.height * 0.5 + verticalOffset)
     }
 }
 
