@@ -213,10 +213,10 @@ extension ImageViewer: UIGestureRecognizerDelegate {
     fileprivate func cancelDrag() {
         animator.removeAllBehaviors()
         
-        UIViewPropertyAnimator(duration: 0.3, curve: .easeOut, animations: {
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut, animations: {
             self.imageView.transform = CGAffineTransform.identity
             self.imageView.center = CGPoint(x: self.view.bounds.width / 2,
                                             y: self.view.bounds.height / 2)
-        }).startAnimation()
+        })
     }
 }
