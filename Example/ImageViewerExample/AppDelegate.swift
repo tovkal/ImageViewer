@@ -1,8 +1,8 @@
 //
 //  AppDelegate.swift
-//  ImageViewer
+//  ImageViewerExample
 //
-//  Created by Andrés Pizá Bückmann on 04/06/2017.
+//  Created by Andrés Pizá Bückmann on 10/06/2017.
 //  Copyright © 2017 Andrés Pizá Bückmann. All rights reserved.
 //
 

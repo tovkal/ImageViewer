@@ -8,7 +8,10 @@
 
 import UIKit
 
-class ImageViewer: UIViewController {
+/// Image Viewer
+///
+/// Displays a given ImageView in full screen, blurring the background.
+public final class ImageViewer: UIViewController {
     fileprivate let originalImageView: UIImageView
     fileprivate let presentingVC: UIViewController
     fileprivate lazy var scrollView = UIScrollView()
@@ -21,12 +24,12 @@ class ImageViewer: UIViewController {
     fileprivate var attachmentBehavior: UIAttachmentBehavior?
     fileprivate lazy var animator = UIDynamicAnimator()
     
-    static func showImage(imageView: UIImageView, presentingVC: UIViewController) {
+    public static func showImage(imageView: UIImageView, presentingVC: UIViewController) {
         let imageViewer = ImageViewer(imageView: imageView, presentingVC: presentingVC)
         imageViewer.presentingVC.present(imageViewer, animated: false, completion: nil)
     }
     
-    init(imageView: UIImageView, presentingVC: UIViewController) {
+    fileprivate init(imageView: UIImageView, presentingVC: UIViewController) {
         self.originalImageView = imageView
         self.presentingVC = presentingVC
         super.init(nibName: nil, bundle: nil)
@@ -34,18 +37,18 @@ class ImageViewer: UIViewController {
         self.modalPresentationStyle = .overFullScreen
     }
     
-    required init?(coder aDecoder: NSCoder) {
+    required public init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    override func loadView() {
+    override public func loadView() {
         super.loadView()
         
         configureViews()
         configureGestures()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
+    override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
         guard let image = originalImageView.image else { return }
@@ -100,16 +103,16 @@ class ImageViewer: UIViewController {
     }
     
     fileprivate func configureGestures() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(ImageViewer.tapImage(_:)))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(tapImage))
         scrollView.addGestureRecognizer(tap)
         
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(ImageViewer.dismissPan(_:)))
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(dismissPan))
         panGesture.maximumNumberOfTouches = 1
         panGesture.delegate = self
         scrollView.addGestureRecognizer(panGesture)
     }
     
-    func tapImage(_ sender: UITapGestureRecognizer) {
+    @objc fileprivate func tapImage(_ sender: UITapGestureRecognizer) {
         UIView.animate(withDuration: 0.2, animations: {
             self.imageView.frame = self.originalImageView.frame
         }, completion: { finished in self.dismiss(animated: false) })
@@ -117,12 +120,12 @@ class ImageViewer: UIViewController {
 }
 
 extension ImageViewer: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+    public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.imageView
     }
     
     // When zooming, center the image
-    func scrollViewDidZoom(_ scrollView: UIScrollView) {
+    public func scrollViewDidZoom(_ scrollView: UIScrollView) {
         let horizontalOffset = (scrollView.bounds.size.width > scrollView.contentSize.width) ? ((scrollView.bounds.size.width - scrollView.contentSize.width) * 0.5): 0.0
         let verticalOffset   = (scrollView.bounds.size.height > scrollView.contentSize.height) ? ((scrollView.bounds.size.height - scrollView.contentSize.height) * 0.5): 0.0
         
@@ -131,7 +134,7 @@ extension ImageViewer: UIScrollViewDelegate {
 }
 
 extension ImageViewer: UIGestureRecognizerDelegate {
-    func dismissPan(_ recognizer: UIPanGestureRecognizer) {
+    @objc fileprivate func dismissPan(_ recognizer: UIPanGestureRecognizer) {
         let touchPoint = recognizer.location(in: recognizer.view)
         let translation = recognizer.translation(in: recognizer.view)
         let velocity = recognizer.velocity(in: recognizer.view)
