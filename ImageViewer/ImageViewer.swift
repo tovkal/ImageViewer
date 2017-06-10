@@ -135,6 +135,9 @@ extension ImageViewer: UIScrollViewDelegate {
 
 extension ImageViewer: UIGestureRecognizerDelegate {
     @objc fileprivate func dismissPan(_ recognizer: UIPanGestureRecognizer) {
+        // Only dismiss when not zoomed in
+        guard scrollView.zoomScale == scrollView.minimumZoomScale else { return }
+        
         let touchPoint = recognizer.location(in: recognizer.view)
         let translation = recognizer.translation(in: recognizer.view)
         let velocity = recognizer.velocity(in: recognizer.view)
