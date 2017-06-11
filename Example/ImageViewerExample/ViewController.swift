@@ -20,7 +20,7 @@ class ViewController: UIViewController {
     }
     
     @IBAction func didTapImage(_ sender: UITapGestureRecognizer) {
-        ImageViewer.showImage(imageView: imageView, presentingVC: self)
+        ImageViewer.show(imageView, presentingVC: self)
     }
 }
 

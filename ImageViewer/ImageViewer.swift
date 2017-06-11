@@ -12,19 +12,26 @@ import UIKit
 ///
 /// Displays a given ImageView in full screen, blurring the background.
 public final class ImageViewer: UIViewController {
+    // Views
     fileprivate let originalImageView: UIImageView
     fileprivate let presentingVC: UIViewController
     fileprivate lazy var scrollView = UIScrollView()
     fileprivate lazy var imageView = UIImageView()
     fileprivate var blurEffectView: UIVisualEffectView?
     
+    // Flick to dismiss vars
+    fileprivate var panGesture: UIPanGestureRecognizer?
     fileprivate lazy var isDraggingImage = false
     fileprivate lazy var initialTouchPoint = CGPoint.zero
     fileprivate lazy var dragOffsetFromTranslation = UIOffset.zero
     fileprivate var attachmentBehavior: UIAttachmentBehavior?
     fileprivate lazy var animator = UIDynamicAnimator()
     
-    public static func showImage(imageView: UIImageView, presentingVC: UIViewController) {
+    // Constants
+    fileprivate let minimumZoomScale: CGFloat = 1
+    fileprivate let minimumVectorDistanceForFlick: CGFloat = 1000
+    
+    public static func show(_ imageView: UIImageView, presentingVC: UIViewController) {
         let imageViewer = ImageViewer(imageView: imageView, presentingVC: presentingVC)
         imageViewer.presentingVC.present(imageViewer, animated: false, completion: nil)
     }
@@ -84,9 +91,9 @@ public final class ImageViewer: UIViewController {
         
         scrollView.frame = self.view.bounds
         scrollView.delegate = self
-        scrollView.minimumZoomScale = 1
-        scrollView.maximumZoomScale = 10
-        scrollView.isScrollEnabled = false
+        scrollView.minimumZoomScale = minimumZoomScale
+        scrollView.maximumZoomScale = calculateMaximumZoomScale()
+        scrollView.isScrollEnabled = true
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
         self.view.addSubview(scrollView)
@@ -102,23 +109,25 @@ public final class ImageViewer: UIViewController {
         animator = UIDynamicAnimator(referenceView: scrollView)
     }
     
+    fileprivate func calculateMaximumZoomScale() -> CGFloat {
+        guard let imageSize = originalImageView.image?.size else { return 8 }
+        let result = (min(imageSize.width, imageSize.height) / min(scrollView.frame.width, scrollView.frame.height) * 4).rounded()
+        
+        return result > minimumZoomScale ? result : minimumZoomScale + 1
+    }
+    
     fileprivate func configureGestures() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(tapImage))
         scrollView.addGestureRecognizer(tap)
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(dismissPan))
         panGesture.maximumNumberOfTouches = 1
-        panGesture.delegate = self
+        self.panGesture = panGesture
         scrollView.addGestureRecognizer(panGesture)
-    }
-    
-    @objc fileprivate func tapImage(_ sender: UITapGestureRecognizer) {
-        UIView.animate(withDuration: 0.2, animations: {
-            self.imageView.frame = self.originalImageView.frame
-        }, completion: { finished in self.dismiss(animated: false) })
     }
 }
 
+// MARK: - ScrollView delegate
 extension ImageViewer: UIScrollViewDelegate {
     public func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.imageView
@@ -131,39 +140,46 @@ extension ImageViewer: UIScrollViewDelegate {
         
         imageView.center = CGPoint(x: scrollView.contentSize.width * 0.5 + horizontalOffset, y: scrollView.contentSize.height * 0.5 + verticalOffset)
     }
+    
+    public func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
+        panGesture?.isEnabled = false
+    }
+    
+    public func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        if scale == 1 {
+            panGesture?.isEnabled = true
+        }
+    }
 }
 
-extension ImageViewer: UIGestureRecognizerDelegate {
+// MARK: - Tap gesture methods
+extension ImageViewer {
+    @objc fileprivate func tapImage(_ sender: UITapGestureRecognizer) {
+        UIView.animate(withDuration: 0.2, animations: {
+            self.imageView.frame = self.originalImageView.frame
+        }, completion: { finished in self.dismiss(animated: false) })
+    }
+}
+
+// MARK: - Pan gesture methods
+extension ImageViewer {
     @objc fileprivate func dismissPan(_ recognizer: UIPanGestureRecognizer) {
-        // Only dismiss when not zoomed in
-        guard scrollView.zoomScale == scrollView.minimumZoomScale else { return }
-        
         let touchPoint = recognizer.location(in: recognizer.view)
         let translation = recognizer.translation(in: recognizer.view)
         let velocity = recognizer.velocity(in: recognizer.view)
-        let distance = sqrt(pow(velocity.x, 2) + pow(velocity.y, 2))
+        let vectorDistance = sqrt(pow(velocity.x, 2) + pow(velocity.y, 2))
         
         switch recognizer.state {
         case .began:
-            isDraggingImage = imageView.frame.contains(touchPoint)
-            if isDraggingImage {
-                startImageDragging(touchPoint, translationOffset: .zero)
-            }
+            animator.removeAllBehaviors()
+            startImageDragging(touchPoint, translationOffset: .zero)
         case .changed:
-            if isDraggingImage {
-                var newAnchor = initialTouchPoint
-                newAnchor.x += translation.x + dragOffsetFromTranslation.horizontal
-                newAnchor.y += translation.y + dragOffsetFromTranslation.vertical
-                attachmentBehavior?.anchorPoint = newAnchor
-            } else {
-                isDraggingImage = imageView.frame.contains(touchPoint)
-                if isDraggingImage {
-                    let translationOffset = UIOffset(horizontal: -1 * translation.x, vertical: -1 * translation.y)
-                    startImageDragging(touchPoint, translationOffset: translationOffset)
-                }
-            }
+            var newAnchor = initialTouchPoint
+            newAnchor.x += translation.x + dragOffsetFromTranslation.horizontal
+            newAnchor.y += translation.y + dragOffsetFromTranslation.vertical
+            attachmentBehavior?.anchorPoint = newAnchor
         case .ended:
-            if distance > 600 {
+            if vectorDistance > minimumVectorDistanceForFlick {
                 dismiss(with: velocity)
             } else {
                 cancelDrag()
