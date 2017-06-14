@@ -12,6 +12,7 @@ import UIKit
 ///
 /// Displays a given ImageView in full screen, blurring the background.
 public final class ImageViewer: UIViewController {
+    // MARK: - Properties
     // Views
     fileprivate let originalImageView: UIImageView
     fileprivate let presentingVC: UIViewController
@@ -55,20 +56,74 @@ public final class ImageViewer: UIViewController {
         configureGestures()
     }
     
-    override public func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
+    override public func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
         
         guard let image = originalImageView.image else { return }
         
-        imageView.frame = originalImageView.convert(originalImageView.bounds, to: self.view)
-        
         UIView.animate(withDuration: 0.2, animations: {
-            let imageSize = image.size
-            let imageOrigin = CGPoint(x: self.view.frame.size.width/2 - imageSize.width/2,
-                                      y: self.view.frame.size.height/2 - imageSize.height/2)
-            self.imageView.frame = CGRect(x: imageOrigin.x, y: imageOrigin.y,
-                                          width: imageSize.width, height: imageSize.height)
+            self.imageView.frame = self.centerImageOnScreen(image)
+        }, completion: { _ in
+            self.adjustContentInsets(image)
         })
+    }
+    
+    public override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+        super.viewWillTransition(to: size, with: coordinator)
+        guard let image = self.imageView.image else { return }
+        coordinator.animate(alongsideTransition: { context in
+            self.scrollView.frame = self.view.bounds
+            self.imageView.frame = self.centerImageOnScreen(image)
+            self.adjustContentInsets(image)
+        })
+    }
+    
+    fileprivate func centerImageOnScreen(_ image: UIImage) -> CGRect {
+        let imageSize = imageSizeThatFits(image)
+        let imageOrigin = CGPoint(x: self.view.frame.size.width/2 - imageSize.width/2, y: self.view.frame.size.height/2 - imageSize.height/2)
+        return CGRect(x: imageOrigin.x, y: imageOrigin.y, width: imageSize.width, height: imageSize.height)
+    }
+    
+    fileprivate func imageSizeThatFits(_ image: UIImage) -> CGSize {
+        let imageSize = image.size
+        var ratio = min(self.view.frame.size.width/imageSize.width, self.view.frame.size.height/imageSize.height)
+        ratio = min(ratio, 1.0) //If image smaller than screen, don't make bigger
+        return CGSize(width: imageSize.width * ratio, height: imageSize.height * ratio)
+    }
+    
+    fileprivate func adjustContentInsets(_ image: UIImage) {
+        let imageSize = self.imageSizeThatFits(image)
+        let imageFrame = CGRect(origin: CGPoint.zero, size: imageSize)
+        
+        scrollView.zoomScale = 1
+        scrollView.contentSize = imageSize
+        imageView.frame = imageFrame
+        
+        panGesture?.isEnabled = true // enable because we set zoomscale to 1
+        
+        let scrollBounds = scrollView.bounds
+        var contentOffset = scrollView.contentOffset
+        
+        if (imageFrame.size.width < scrollBounds.size.width) || (imageFrame.size.height < scrollBounds.size.height) {
+            let x = imageView.center.x - (scrollBounds.size.width / 2)
+            let y = imageView.center.y - (scrollBounds.size.height / 2)
+            contentOffset = CGPoint(x: x, y: y)
+        }
+        
+        var insets = UIEdgeInsets.zero
+        
+        if scrollBounds.size.width > imageFrame.size.width {
+            insets.left = (scrollBounds.size.width - imageFrame.size.width) / 2
+            insets.right = insets.left
+        }
+        
+        if scrollBounds.size.height > imageFrame.size.height {
+            insets.top = (scrollBounds.size.height - imageFrame.size.height) / 2
+            insets.bottom = insets.top
+        }
+        
+        scrollView.contentOffset = contentOffset
+        scrollView.contentInset = insets
     }
     
     fileprivate func configureViews() {
@@ -98,7 +153,7 @@ public final class ImageViewer: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         self.view.addSubview(scrollView)
         
-        imageView.frame = self.view.bounds
+        imageView.frame = originalImageView.convert(originalImageView.bounds, to: self.view)
         imageView.image = originalImageView.image
         imageView.contentMode = .scaleAspectFit
         imageView.isUserInteractionEnabled = true
@@ -135,10 +190,24 @@ extension ImageViewer: UIScrollViewDelegate {
     
     // When zooming, center the image
     public func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        let horizontalOffset = (scrollView.bounds.size.width > scrollView.contentSize.width) ? ((scrollView.bounds.size.width - scrollView.contentSize.width) * 0.5): 0.0
-        let verticalOffset   = (scrollView.bounds.size.height > scrollView.contentSize.height) ? ((scrollView.bounds.size.height - scrollView.contentSize.height) * 0.5): 0.0
+        let imageFrame = imageView.frame
+        let scrollBounds = scrollView.bounds
         
-        imageView.center = CGPoint(x: scrollView.contentSize.width * 0.5 + horizontalOffset, y: scrollView.contentSize.height * 0.5 + verticalOffset)
+        var insets = UIEdgeInsets.zero
+        
+        // Not sure why +1 is needed, but without it when the image is zommed it doesn't bounce when scrolling it
+        
+        if scrollBounds.size.width > imageFrame.size.width {
+            insets.left = ((scrollBounds.size.width - imageFrame.size.width) / 2) + 1
+            insets.right = insets.left
+        }
+        
+        if scrollBounds.size.height > imageFrame.size.height {
+            insets.top = ((scrollBounds.size.height - imageFrame.size.height) / 2) + 1
+            insets.bottom = insets.top
+        }
+        
+        scrollView.contentInset = insets
     }
     
     public func scrollViewWillBeginZooming(_ scrollView: UIScrollView, with view: UIView?) {
@@ -156,6 +225,7 @@ extension ImageViewer: UIScrollViewDelegate {
 extension ImageViewer {
     @objc fileprivate func tapImage(_ sender: UITapGestureRecognizer) {
         UIView.animate(withDuration: 0.2, animations: {
+            self.scrollView.contentInset.top = 0 // Needed so it animates nicely into the original UIImageView frame
             self.imageView.frame = self.originalImageView.frame
         }, completion: { finished in self.dismiss(animated: false) })
     }
@@ -232,10 +302,12 @@ extension ImageViewer {
     fileprivate func cancelDrag() {
         animator.removeAllBehaviors()
         
+        guard let image = self.imageView.image else { return }
+        
         UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut, animations: {
             self.imageView.transform = CGAffineTransform.identity
-            self.imageView.center = CGPoint(x: self.view.bounds.width / 2,
-                                            y: self.view.bounds.height / 2)
+            self.imageView.frame = self.centerImageOnScreen(image)
+            self.adjustContentInsets(image)
         })
     }
 }
