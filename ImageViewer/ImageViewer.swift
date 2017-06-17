@@ -224,9 +224,15 @@ extension ImageViewer: UIScrollViewDelegate {
 // MARK: - Tap gesture methods
 extension ImageViewer {
     @objc fileprivate func tapImage(_ sender: UITapGestureRecognizer) {
+        let imageFrame = self.view.convert(self.imageView.frame, from: self.imageView.superview)
+        self.scrollView.contentOffset = .zero
+        self.scrollView.contentInset = .zero
+        self.imageView.frame = imageFrame
+
+        let originalImageFrameRect = self.originalImageView.convert(self.originalImageView.frame, to: self.view)
+        
         UIView.animate(withDuration: 0.2, animations: {
-            self.scrollView.contentInset.top = 0 // Needed so it animates nicely into the original UIImageView frame
-            self.imageView.frame = self.originalImageView.frame
+            self.imageView.frame = originalImageFrameRect
         }, completion: { finished in self.dismiss(animated: false) })
     }
 }
