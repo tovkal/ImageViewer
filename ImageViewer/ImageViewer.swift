@@ -131,7 +131,7 @@ public final class ImageViewer: UIViewController {
         self.view = UIView(frame: UIScreen.main.bounds)
         
         // Blur background
-        if !UIAccessibilityIsReduceTransparencyEnabled() {
+        if !UIAccessibility.isReduceTransparencyEnabled {
             self.view.backgroundColor = UIColor.clear
             
             let blurEffectView = UIVisualEffectView(effect: UIBlurEffect(style: .light))
