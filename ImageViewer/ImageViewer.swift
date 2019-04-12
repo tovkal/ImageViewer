@@ -14,11 +14,11 @@ import UIKit
 public final class ImageViewer: UIViewController {
     // MARK: - Properties
     // Views
-    fileprivate let originalImageView: UIImageView
-    fileprivate let presentingVC: UIViewController
+    fileprivate weak var originalImageView: UIImageView?
+    fileprivate weak var presentingVC: UIViewController?
     fileprivate lazy var scrollView = UIScrollView()
     fileprivate lazy var imageView = UIImageView()
-    fileprivate var blurEffectView: UIVisualEffectView?
+    fileprivate weak var blurEffectView: UIVisualEffectView?
     
     // Flick to dismiss vars
     fileprivate var panGesture: UIPanGestureRecognizer?
@@ -34,7 +34,7 @@ public final class ImageViewer: UIViewController {
     
     public static func show(_ imageView: UIImageView, presentingVC: UIViewController) {
         let imageViewer = ImageViewer(imageView: imageView, presentingVC: presentingVC)
-        imageViewer.presentingVC.present(imageViewer, animated: false, completion: nil)
+        imageViewer.presentingVC?.present(imageViewer, animated: false, completion: nil)
     }
     
     fileprivate init(imageView: UIImageView, presentingVC: UIViewController) {
@@ -59,7 +59,7 @@ public final class ImageViewer: UIViewController {
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
-        guard let image = originalImageView.image else { return }
+        guard let image = originalImageView?.image else { return }
         
         UIView.animate(withDuration: 0.2, animations: {
             self.imageView.frame = self.centerImageOnScreen(image)
@@ -153,6 +153,8 @@ public final class ImageViewer: UIViewController {
         scrollView.showsVerticalScrollIndicator = false
         self.view.addSubview(scrollView)
         
+        guard let originalImageView = self.originalImageView else { return }
+        
         imageView.frame = originalImageView.convert(originalImageView.bounds, to: self.view)
         imageView.image = originalImageView.image
         imageView.contentMode = .scaleAspectFit
@@ -165,7 +167,7 @@ public final class ImageViewer: UIViewController {
     }
     
     fileprivate func calculateMaximumZoomScale() -> CGFloat {
-        guard let imageSize = originalImageView.image?.size else { return 8 }
+        guard let imageSize = originalImageView?.image?.size else { return 8 }
         let result = (min(imageSize.width, imageSize.height) / min(scrollView.frame.width, scrollView.frame.height) * 4).rounded()
         
         return result > minimumZoomScale ? result : minimumZoomScale + 1
@@ -228,8 +230,9 @@ extension ImageViewer {
         self.scrollView.contentOffset = .zero
         self.scrollView.contentInset = .zero
         self.imageView.frame = imageFrame
-
-        let originalImageFrameRect = self.originalImageView.convert(self.originalImageView.frame, to: self.view)
+        
+        guard let originalImageView = self.originalImageView else { return }
+        let originalImageFrameRect = originalImageView.convert(originalImageView.frame, to: self.view)
         
         UIView.animate(withDuration: 0.2, animations: {
             self.imageView.frame = originalImageFrameRect
