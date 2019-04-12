@@ -38,5 +38,6 @@ platform :ios do
         commitish: "master",
         upload_assets: ["ImageViewer.framework.zip"]
     )
+    sh("rm", "../ImageViewer.framework.zip")
     end
 end

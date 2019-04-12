@@ -69,3 +69,6 @@ fastlane/metadata
 
 # macOS
 .DS_Store
+
+
+*.framework.zip
