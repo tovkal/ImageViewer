@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
   spec.name = "ImageViewer"
-  spec.version = "0.1.2"
+  spec.version = "0.1.3"
   spec.summary = "Simple full screen UIImageView viewer."
   spec.description = <<-DESC
   Simple full screen UIImageView viewer, can be dismissed with a tap or flick
