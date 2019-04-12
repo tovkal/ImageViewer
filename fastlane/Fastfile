@@ -1,0 +1,42 @@
+default_platform(:ios)
+
+platform :ios do
+    desc "Create a new release"
+    lane :github_release do
+    ensure_git_status_clean
+    version = increment_version_number
+    increment_version_number(xcodeproj: "./Example/ImageViewerExample.xcodeproj/")
+    version_bump_podspec
+    carthage(
+        command: "build",
+        no_skip_current: true
+    )
+    carthage(
+        command: "archive"
+    )
+    git_commit(
+        path: [
+            "ImageViewer.xcodeproj/project.pbxproj",
+            "ImageViewer/Info.plist",
+            "Example/ImageViewerExample/Info.plist",
+            "ImageViewer.podspec",
+            "ImageViewer/Info.plist"
+        ],
+        message: "Version bump to #{version}"
+    )
+    add_git_tag(
+        tag: version
+    )
+    push_to_git_remote
+    release_name = prompt(text: "Release name: ")
+    github_release = set_github_release(
+        repository_name: "tovkal/ImageViewer",
+        api_token: ENV["GITHUB_TOKEN"],
+        name: release_name,
+        tag_name: version,
+        description: "No changelog provided",
+        commitish: "master",
+        upload_assets: ["ImageViewer.framework.zip"]
+    )
+    end
+end
