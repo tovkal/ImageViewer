@@ -99,18 +99,18 @@
 					95B6DC9E1EEC27D0007C1BE1 = {
 						CreatedOnToolsVersion = 8.3.3;
 						DevelopmentTeam = JVHN2X67GT;
-						LastSwiftMigration = 1010;
+						LastSwiftMigration = 1020;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
 			buildConfigurationList = 95B6DC991EEC27D0007C1BE1 /* Build configuration list for PBXProject "ImageViewer" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				English,
 				en,
+				Base,
 			);
 			mainGroup = 95B6DC951EEC27D0007C1BE1;
 			productRefGroup = 95B6DCA01EEC27D0007C1BE1 /* Products */;
@@ -279,8 +279,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
-				SWIFT_VERSION = 4.2;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -301,8 +300,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.tovkal.ImageViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
-				SWIFT_VERSION = 4.2;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
